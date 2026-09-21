@@ -64,7 +64,23 @@ then draws a dense starfield over it every frame — three depth layers drifting
 at different speeds, a few percent of stars bright with a halo, some twinkling.
 Everything is seeded (`mulberry32`), so the sky is the same on every visit.
 `prefers-reduced-motion` renders the same sky once and skips the animation
-loop; the loop also pauses while the tab is hidden.
+loop; the loop also pauses while the tab is hidden. A **Pause sky / Play sky**
+button in the footer (WCAG 2.2.2) stops and restarts the drift and twinkle;
+under reduced motion it starts as "Play sky", offering the animation as an
+opt-in. Its label is the action and it deliberately carries no `aria-pressed`:
+that attribute belongs with a stable name, and "Play sky, pressed" would
+contradict itself.
+
+Text sits over a starfield, so every text element carries two dark
+`text-shadow`s (the `--halo` token): a thick near-solid one hugging the
+letterforms (zero-blur offset copies at 1px and 2px in eight directions plus 3px
+in the four cardinal ones, a near-circular solid ring, carried out smoothly by
+stacked short blurs) and a wide soft one dimming the sky around the block, so a star
+landing under a glyph does not steal its contrast. Secondary text and the
+footer are at 72% opacity for the same reason: at 55% the best possible ratio
+was 5.3:1 with no headroom, and the old 30% footer failed the 4.5:1 AA floor
+outright. Measured under and 1px around every glyph with the text rendered
+transparent, against the real sky and against an all-white canvas.
 
 The page carries `const BUILD = 'dev';` at two-space indent, which `iqiq
 deploy` stamps with the deployed short SHA; the footer shows it once stamped
