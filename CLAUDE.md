@@ -67,7 +67,9 @@ Everything is seeded (`mulberry32`), so the sky is the same on every visit.
 loop; the loop also pauses while the tab is hidden. A **Pause sky / Play sky**
 button in the footer (WCAG 2.2.2) stops and restarts the drift and twinkle;
 under reduced motion it starts as "Play sky", offering the animation as an
-opt-in.
+opt-in. Its label is the action and it deliberately carries no `aria-pressed`:
+that attribute belongs with a stable name, and "Play sky, pressed" would
+contradict itself.
 
 Text sits over a starfield, so every text element carries two dark
 `text-shadow`s (the `--halo` token): a thick near-solid one hugging the

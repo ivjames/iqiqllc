@@ -130,7 +130,9 @@
     gap: 16px;
   }
   /* Pause/resume for the sky (WCAG 2.2.2): text-styled like the links, but a
-     real button, with a target no smaller than 24x24 and a visible focus ring. */
+     real button, with a target no smaller than 24x24 and a visible focus ring.
+     Its label is the action ("Pause sky" / "Play sky"); it carries no
+     aria-pressed, since that belongs with a name that does not change. */
   #sky-toggle {
     font: inherit;
     letter-spacing: inherit;
@@ -171,7 +173,7 @@
 <footer>
   <span>IQIQ, LLC &middot; &copy; 2026</span>
   <span id="build"></span>
-  <button id="sky-toggle" type="button" aria-pressed="false">Pause sky</button>
+  <button id="sky-toggle" type="button">Pause sky</button>
 </footer>
 
 <script>
@@ -390,9 +392,11 @@
   // starts, so the control offers to play instead.
   let paused = reduceMotion;
   const toggle = document.getElementById('sky-toggle');
+  // An action label that changes with the state, not aria-pressed: a toggle
+  // button's pressed state belongs with a stable name, and "Play sky, pressed"
+  // would contradict itself. The label alone says what pressing will do.
   function renderToggle() {
     toggle.textContent = paused ? 'Play sky' : 'Pause sky';
-    toggle.setAttribute('aria-pressed', String(paused));
   }
   function start() {
     cancelAnimationFrame(raf);
