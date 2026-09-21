@@ -1,0 +1,7 @@
+# Nothing to build and no secrets on a static site. Keep editor droppings out,
+# and keep .claude/rules/ IN (it is the owned conventions file — a blanket
+# `.claude/` here would silently drop it from every commit).
+.DS_Store
+*.swp
+.claude/*
+!.claude/rules/

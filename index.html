@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>IQIQ LLC</title>
+<meta name="description" content="IQIQ LLC">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#04030c">
+<style>
+  :root {
+    --bg: #04030c;
+    --fg: #e9e6f5;
+    --muted: rgba(233, 230, 245, 0.55);
+    color-scheme: dark;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0;
+    height: 100%;
+    background: var(--bg);
+    color: var(--fg);
+    font-family: ui-monospace, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+    -webkit-font-smoothing: antialiased;
+  }
+  body { overflow: hidden; }
+  #sky {
+    position: fixed;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    display: block;
+  }
+  main {
+    position: relative;
+    z-index: 1;
+    min-height: 100%;
+    display: grid;
+    place-items: center;
+    padding: 24px 16px;
+    text-align: center;
+  }
+  h1 {
+    margin: 0;
+    font-weight: 500;
+    font-size: clamp(2rem, 8vw, 5rem);
+    letter-spacing: 0.32em;
+    text-indent: 0.32em; /* re-centre: letter-spacing adds trailing space */
+    text-shadow: 0 0 24px rgba(160, 140, 255, 0.35), 0 0 2px rgba(0,0,0,0.8);
+  }
+  p {
+    margin: 1.2em 0 0;
+    font-size: clamp(0.8rem, 2vw, 1rem);
+    letter-spacing: 0.18em;
+    color: var(--muted);
+  }
+  footer {
+    position: fixed;
+    left: 0; right: 0; bottom: 0;
+    z-index: 1;
+    padding: 12px 16px;
+    font-size: 0.7rem;
+    letter-spacing: 0.08em;
+    color: rgba(233, 230, 245, 0.3);
+    display: flex;
+    justify-content: space-between;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    /* the sky still renders; it just doesn't animate — see script */
+  }
+</style>
+</head>
+<body>
+<canvas id="sky" aria-hidden="true"></canvas>
+
+<main>
+  <div>
+    <h1>IQIQ</h1>
+    <p>IQIQ LLC</p>
+  </div>
+</main>
+
+<footer>
+  <span>&copy; <span id="year"></span> IQIQ LLC</span>
+  <span id="build"></span>
+</footer>
+
+<script>
+  // Stamped with the deployed commit by `iqiq deploy` (see bin/iqiq). Keep the
+  // two-space indent and quote style: the deploy sed is anchored to this line.
+  const BUILD = 'dev';
+
+  document.getElementById('year').textContent = new Date().getFullYear();
+  document.getElementById('build').textContent = BUILD === 'dev' ? '' : BUILD;
+
+  // ---------------------------------------------------------------------
+  // Sky: a nebula painted once to an offscreen canvas (value noise + a few
+  // hue-tinted clouds), and a dense starfield drawn over it every frame with
+  // slow drift and twinkle. Nothing here is fetched; it's all procedural.
+  // ---------------------------------------------------------------------
+  const canvas = document.getElementById('sky');
+  const ctx = canvas.getContext('2d');
+  const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  // Deterministic PRNG so the sky is the same on every visit.
+  function mulberry32(seed) {
+    let a = seed >>> 0;
+    return function () {
+      a |= 0; a = (a + 0x6D2B79F5) | 0;
+      let t = Math.imul(a ^ (a >>> 15), 1 | a);
+      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+
+  // --- value noise / fBm for the nebula ------------------------------------
+  const NOISE_SIZE = 256;
+  function makeNoiseGrid(rand) {
+    const g = new Float32Array(NOISE_SIZE * NOISE_SIZE);
+    for (let i = 0; i < g.length; i++) g[i] = rand();
+    return g;
+  }
+  function smooth(t) { return t * t * (3 - 2 * t); }
+  function noise2(grid, x, y) {
+    const xi = Math.floor(x), yi = Math.floor(y);
+    const xf = x - xi, yf = y - yi;
+    const x0 = xi & (NOISE_SIZE - 1), y0 = yi & (NOISE_SIZE - 1);
+    const x1 = (x0 + 1) & (NOISE_SIZE - 1), y1 = (y0 + 1) & (NOISE_SIZE - 1);
+    const a = grid[y0 * NOISE_SIZE + x0], b = grid[y0 * NOISE_SIZE + x1];
+    const c = grid[y1 * NOISE_SIZE + x0], d = grid[y1 * NOISE_SIZE + x1];
+    const u = smooth(xf), v = smooth(yf);
+    return (a * (1 - u) + b * u) * (1 - v) + (c * (1 - u) + d * u) * v;
+  }
+  function fbm(grid, x, y, octaves) {
+    let sum = 0, amp = 0.5, freq = 1, norm = 0;
+    for (let o = 0; o < octaves; o++) {
+      sum += amp * noise2(grid, x * freq, y * freq);
+      norm += amp;
+      amp *= 0.5; freq *= 2.07;
+    }
+    return sum / norm;
+  }
+
+  // Nebula clouds: each is a soft blob of colour whose density is modulated by
+  // fBm so it reads as gas rather than a gradient.
+  const CLOUDS = [
+    { cx: 0.30, cy: 0.42, rx: 0.55, ry: 0.40, rgb: [110, 60, 200], gain: 0.85 },  // violet core
+    { cx: 0.68, cy: 0.62, rx: 0.50, ry: 0.35, rgb: [200, 60, 140], gain: 0.70 },  // magenta
+    { cx: 0.55, cy: 0.25, rx: 0.40, ry: 0.32, rgb: [50, 130, 220], gain: 0.60 },  // blue
+    { cx: 0.15, cy: 0.80, rx: 0.35, ry: 0.28, rgb: [30, 170, 170], gain: 0.45 },  // teal fringe
+    { cx: 0.85, cy: 0.15, rx: 0.30, ry: 0.30, rgb: [230, 110, 70], gain: 0.35 },  // ember
+  ];
+
+  const nebula = document.createElement('canvas');
+  let nebulaDirty = true;
+
+  function paintNebula(w, h) {
+    // Render at reduced resolution, then let drawImage scale it: the noise is
+    // low-frequency by design and this keeps first paint quick on phones.
+    const scale = Math.min(1, 480 / Math.max(w, h));
+    const nw = Math.max(64, Math.round(w * scale));
+    const nh = Math.max(64, Math.round(h * scale));
+    nebula.width = nw; nebula.height = nh;
+    const nctx = nebula.getContext('2d');
+    const img = nctx.createImageData(nw, nh);
+    const px = img.data;
+    const rand = mulberry32(0x1919);
+    const gridA = makeNoiseGrid(rand);
+    const gridB = makeNoiseGrid(rand);
+    const aspect = nw / nh;
+
+    for (let y = 0; y < nh; y++) {
+      const v = y / nh;
+      for (let x = 0; x < nw; x++) {
+        const u = x / nw;
+        // Two noise fields: one for large structure, one warped by the first
+        // for filaments. Coordinates in "noise space", aspect-corrected.
+        const nx = u * 6 * aspect, ny = v * 6;
+        const warp = fbm(gridA, nx * 0.5 + 7.3, ny * 0.5 + 2.1, 4);
+        const gas = fbm(gridB, nx + warp * 2.5, ny - warp * 1.8, 5);
+        // Sharpen: gas is ~0.5 mean; pull the tails apart for wispy contrast.
+        const density = Math.pow(Math.max(0, gas - 0.32) / 0.68, 1.6);
+        // Dark dust lanes: a second threshold subtracts where gas is thin.
+        const dust = Math.pow(Math.max(0, 0.48 - gas) / 0.48, 2) * 0.6;
+
+        let r = 0, g = 0, b = 0;
+        for (const c of CLOUDS) {
+          const dx = (u - c.cx) / c.rx, dy = (v - c.cy) / c.ry;
+          const d2 = dx * dx + dy * dy;
+          const fall = Math.exp(-d2 * 2.2) * c.gain;
+          const k = fall * density;
+          r += c.rgb[0] * k; g += c.rgb[1] * k; b += c.rgb[2] * k;
+        }
+        const dim = 1 - dust;
+        const i = (y * nw + x) * 4;
+        px[i]     = Math.min(255, r * dim);
+        px[i + 1] = Math.min(255, g * dim);
+        px[i + 2] = Math.min(255, b * dim);
+        px[i + 3] = 255;
+      }
+    }
+    nctx.putImageData(img, 0, 0);
+    nebulaDirty = false;
+  }
+
+  // --- stars ---------------------------------------------------------------
+  // Dense: ~1 star per 650 CSS pixels, split into three depth layers that
+  // drift at different speeds, plus a sparse set of bright twinklers.
+  let stars = [];
+  let W = 0, H = 0, DPR = 1;
+
+  function makeStars(w, h) {
+    const rand = mulberry32(0x0919);
+    const count = Math.min(8000, Math.round((w * h) / 650));
+    const out = new Array(count);
+    for (let i = 0; i < count; i++) {
+      const layer = rand() < 0.55 ? 0 : (rand() < 0.7 ? 1 : 2);   // 0 far, 2 near
+      const bright = rand() < 0.04;
+      // Slightly tinted: most white, a few blue-white, a few warm.
+      const t = rand();
+      const tint = t < 0.75 ? [255, 255, 255]
+                 : t < 0.90 ? [190, 210, 255]
+                 :            [255, 220, 180];
+      out[i] = {
+        x: rand() * w, y: rand() * h,
+        r: (bright ? 1.1 + rand() * 1.2 : 0.3 + rand() * 0.7) * (0.8 + layer * 0.25),
+        a: bright ? 0.9 : 0.35 + rand() * 0.55,
+        speed: (0.4 + layer * 0.9) * 0.012,           // px per ms, scaled below
+        tw: bright || rand() < 0.15,                   // twinkles?
+        ph: rand() * Math.PI * 2,
+        fr: 0.0006 + rand() * 0.0016,                  // twinkle frequency
+        css: `rgb(${tint[0]},${tint[1]},${tint[2]})`, bright,
+      };
+    }
+    return out;
+  }
+
+  function resize() {
+    DPR = Math.min(2, window.devicePixelRatio || 1);
+    W = Math.floor(window.innerWidth);
+    H = Math.floor(window.innerHeight);
+    canvas.width = Math.floor(W * DPR);
+    canvas.height = Math.floor(H * DPR);
+    canvas.style.width = W + 'px';
+    canvas.style.height = H + 'px';
+    ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+    stars = makeStars(W, H);
+    nebulaDirty = true;
+  }
+
+  let last = performance.now();
+  let raf = 0;
+
+  function frame(now) {
+    const dt = Math.min(50, now - last);
+    last = now;
+    if (nebulaDirty) paintNebula(W, H);
+
+    ctx.globalCompositeOperation = 'source-over';
+    ctx.fillStyle = '#04030c';
+    ctx.fillRect(0, 0, W, H);
+    ctx.globalCompositeOperation = 'screen';
+    ctx.globalAlpha = 1;
+    ctx.drawImage(nebula, 0, 0, W, H);
+
+    // Stars: additive, so bright ones bloom over the gas.
+    ctx.globalCompositeOperation = 'lighter';
+    for (const s of stars) {
+      if (!reduceMotion) {
+        s.x -= s.speed * dt * 0.06;          // very slow rightward-to-left drift
+        if (s.x < -2) { s.x = W + 2; s.y = Math.random() * H; }
+      }
+      let a = s.a;
+      if (s.tw) a *= 0.65 + 0.35 * Math.sin(now * s.fr + s.ph);
+      ctx.globalAlpha = a;
+      ctx.fillStyle = s.css;
+      if (s.r < 0.8) {
+        // Sub-pixel stars: a tiny rect is indistinguishable from a disc and
+        // far cheaper than a path, which is what keeps thousands of them cheap.
+        ctx.fillRect(s.x - s.r, s.y - s.r, s.r * 2, s.r * 2);
+      } else {
+        ctx.beginPath();
+        ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      if (s.bright) {
+        // Soft halo for the bright ones.
+        ctx.globalAlpha = a * 0.18;
+        ctx.beginPath();
+        ctx.arc(s.x, s.y, s.r * 3.2, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+    ctx.globalAlpha = 1;
+    ctx.globalCompositeOperation = 'source-over';
+
+    if (!reduceMotion) raf = requestAnimationFrame(frame);
+  }
+
+  function start() {
+    cancelAnimationFrame(raf);
+    last = performance.now();
+    raf = requestAnimationFrame(frame);
+  }
+
+  let resizeTimer = 0;
+  window.addEventListener('resize', () => {
+    clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(() => { resize(); start(); }, 120);
+  });
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) cancelAnimationFrame(raf); else start();
+  });
+
+  resize();
+  start();
+</script>
+</body>
+</html>
