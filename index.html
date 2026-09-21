@@ -23,7 +23,11 @@
     font-family: ui-monospace, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
     -webkit-font-smoothing: antialiased;
   }
-  body { overflow: hidden; }
+  /* No horizontal scroll (the canvas is sized to the viewport), but let the
+     page scroll vertically: on a short viewport or at high zoom the content is
+     taller than the window, and the footer is fixed, so the last row would
+     otherwise be clipped with no way to reach it. */
+  body { overflow-x: hidden; overflow-y: auto; }
   #sky {
     position: fixed;
     inset: 0;
@@ -37,7 +41,8 @@
     min-height: 100%;
     display: grid;
     place-items: center;
-    padding: 24px 16px;
+    /* Bottom padding clears the fixed footer so the last row is never under it. */
+    padding: 24px 16px 64px;
     text-align: center;
   }
   h1 {
