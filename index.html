@@ -3,8 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>IQIQ LLC</title>
-<meta name="description" content="IQIQ LLC">
+<title>IQIQ, LLC</title>
+<meta name="description" content="IQIQ, LLC — a California limited liability company.">
 <meta name="color-scheme" content="dark">
 <meta name="theme-color" content="#04030c">
 <style>
@@ -48,11 +48,41 @@
     text-indent: 0.32em; /* re-centre: letter-spacing adds trailing space */
     text-shadow: 0 0 24px rgba(160, 140, 255, 0.35), 0 0 2px rgba(0,0,0,0.8);
   }
-  p {
+  .tagline {
     margin: 1.2em 0 0;
     font-size: clamp(0.8rem, 2vw, 1rem);
     letter-spacing: 0.18em;
     color: var(--muted);
+  }
+  dl {
+    margin: 3em auto 0;
+    display: grid;
+    grid-template-columns: max-content max-content;
+    gap: 0.6em 2em;
+    justify-content: center;
+    text-align: left;
+    font-size: clamp(0.8rem, 1.8vw, 0.95rem);
+    letter-spacing: 0.08em;
+  }
+  dt {
+    color: var(--muted);
+    text-transform: uppercase;
+    font-size: 0.85em;
+    letter-spacing: 0.2em;
+    padding-top: 0.15em;
+  }
+  dd { margin: 0; }
+  a {
+    color: var(--fg);
+    text-decoration: none;
+    border-bottom: 1px solid rgba(233, 230, 245, 0.35);
+    transition: border-color 0.2s;
+  }
+  a:hover, a:focus-visible { border-bottom-color: var(--fg); outline: none; }
+  a:focus-visible { outline: 2px solid rgba(160, 140, 255, 0.7); outline-offset: 3px; }
+  @media (max-width: 420px) {
+    dl { grid-template-columns: 1fr; gap: 0.2em 0; text-align: center; }
+    dt { margin-top: 1em; }
   }
   footer {
     position: fixed;
@@ -75,13 +105,19 @@
 
 <main>
   <div>
-    <h1>IQIQ</h1>
-    <p>IQIQ LLC</p>
+    <h1>IQIQ, LLC</h1>
+    <p class="tagline">A California limited liability company.</p>
+    <dl>
+      <dt>Brands</dt>
+      <dd>Vinaigresque &mdash; <a href="https://vinaigresque.com">vinaigresque.com</a></dd>
+      <dt>Contact</dt>
+      <dd><a href="mailto:hello@iqiq.llc">hello@iqiq.llc</a></dd>
+    </dl>
   </div>
 </main>
 
 <footer>
-  <span>&copy; <span id="year"></span> IQIQ LLC</span>
+  <span>IQIQ, LLC &middot; &copy; 2026</span>
   <span id="build"></span>
 </footer>
 
@@ -90,7 +126,6 @@
   // two-space indent and quote style: the deploy sed is anchored to this line.
   const BUILD = 'dev';
 
-  document.getElementById('year').textContent = new Date().getFullYear();
   document.getElementById('build').textContent = BUILD === 'dev' ? '' : BUILD;
 
   // ---------------------------------------------------------------------
